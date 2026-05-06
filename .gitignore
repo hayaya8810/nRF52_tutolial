@@ -1,0 +1,42 @@
+# build outputs
+build/
+out/
+Debug/
+Release/
+cmake-build-*/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Zephyr / west
+.zephyr/
+modules/
+tools/
+bootloader/
+zephyr/
+.zdevcontainer/
+
+# STM32CubeIDE / Eclipse
+.metadata/
+.project
+.cproject
+.settings/
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# binaries / generated
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+*.list
+*.log
