@@ -1,60 +1,83 @@
-/*
- * Copyright (c) 2016 Intel Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
+/**
+******************************************************************************
+* @file				: main.c
+* @brief			: main program for LED blink
+******************************************************************************
+* @attention
+*
+* Copyright (c) 2026 hayaya inc.
+* All rights reserved.
+*
+* This software is licensed under terms that can be found in the LICENSE file
+* in the root directory of this software component.
+* If no LICENSE file comes with this software, it is provided AS-IS.
+*
+******************************************************************************
+*/
+/* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 
-/* 1000 msec = 1 sec */
-#define SLEEP_TIME_MS   1000
+/* Private includes ----------------------------------------------------------*/
+#include "button.h"
+#include "led.h"
 
-/* The devicetree node identifier for the "led0" and "led1" aliases. */
-#define LED0_NODE DT_ALIAS(led0)
-#define LED1_NODE DT_ALIAS(led1)
+/* Private define ------------------------------------------------------------*/
+#define SLEEP_TIME_MS			1000		// 1000ms = 1s
 
-/*
- * A build error on this line means your board is unsupported.
- * See the sample documentation for information on how to fix this.
- */
-static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
+/* Private typedef -----------------------------------------------------------*/
 
+/* Private macro -------------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
+
+/* Private function prototypes -----------------------------------------------*/
+static void button_handler(BUTTON_ID id, BUTTON_EVENT event);
+
+/* External variables --------------------------------------------------------*/
+
+/* Exported functions --------------------------------------------------------*/
+/**
+* @brief Main function
+*/
 int main(void)
 {
 	int ret;
-	bool led_state = true;
-
-	if (!gpio_is_ready_dt(&led0) || !gpio_is_ready_dt(&led1)) {
-		return 0;
+	ret = button_init();
+	if (ret < 0) {
+		printf("Failed to initialize buttons\n");
+		return -1;
+	}
+	ret = led_init();
+	if (ret < 0) {
+		printf("Failed to initialize LEDs\n");
+		return -1;
 	}
 
-	ret = gpio_pin_configure_dt(&led0, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-		return 0;
-	}
-
-	ret = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
-	if (ret < 0) {
-		return 0;
+	for( size_t i = 0; i < BUTTON_ID_COUNT; i++) {
+		ret = button_register_callback((BUTTON_ID)i, button_handler);
+		if (ret < 0) {
+			printf("Failed to register button callback for button %zu\n", i);
+			return -1;
+		}
 	}
 
 	while (1) {
-		ret = gpio_pin_toggle_dt(&led0);
-		if (ret < 0) {
-			return 0;
-		}
-
-		ret = gpio_pin_toggle_dt(&led1);
-		if (ret < 0) {
-			return 0;
-		}
-
-		led_state = !led_state;
-		printf("LED state: %s\n", led_state ? "ON" : "OFF");
 		k_msleep(SLEEP_TIME_MS);
 	}
 	return 0;
+}
+
+/* Private user code ---------------------------------------------------------*/
+/**
+ * @brief Button event handler to toggle corresponding LED on button press
+ * @param[in]	id			Button identifier
+ * @param[in]	event		Button event type (pressed or released)
+ */
+static void button_handler(BUTTON_ID id, BUTTON_EVENT event)
+{
+	if (event == BUTTON_EVENT_PRESSED) {
+		led_toggle(id);
+	}
 }
