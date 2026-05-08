@@ -78,6 +78,21 @@ int main(void)
 static void button_handler(BUTTON_ID id, BUTTON_EVENT event)
 {
 	if (event == BUTTON_EVENT_PRESSED) {
-		led_toggle(id);
+		switch (id){
+		case BUTTON_ID_0:
+			led_blink_toggle(id, 500, 500);	// Toggle blinking with 500ms on and 500ms off
+			break;
+		case BUTTON_ID_1:
+			led_blink_toggle(id, 250, 250);	// Toggle blinking with 500ms on and 500ms off
+			break;
+		case BUTTON_ID_2:
+			led_blink_toggle(id, 125, 125);	// Toggle blinking with 125ms on and 125ms off
+			break;
+		case BUTTON_ID_3:
+			led_toggle(id);
+			break;
+		default:
+			break;
+		}
 	}
 }

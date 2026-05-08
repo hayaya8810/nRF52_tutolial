@@ -62,6 +62,9 @@ int led_get(LED_ID id, LED_STATE *state);
 int led_toggle(LED_ID id);
 int led_set_mask( uint32_t on_mask);
 int led_toggle_mask( uint32_t toggle_mask);
+int led_blink_start( LED_ID id, uint32_t on_time_ms, uint32_t off_time_ms);
+int led_blink_stop( LED_ID id);
+int led_blink_toggle( LED_ID id, uint32_t on_time_ms, uint32_t off_time_ms);
 
 #ifdef __cplusplus
 }
