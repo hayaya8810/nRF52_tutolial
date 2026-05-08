@@ -44,7 +44,7 @@ typedef struct __BUTTON_CONTEXT {
 /**
  * @brief GPIO specifications for each button, obtained from device tree
  */
-static const struct gpio_dt_spec buttons[] = {
+static const struct gpio_dt_spec m_buttons[] = {
 	GPIO_DT_SPEC_GET(BUTTON0_NODE, gpios),
 	GPIO_DT_SPEC_GET(BUTTON1_NODE, gpios),
 	GPIO_DT_SPEC_GET(BUTTON2_NODE, gpios),
@@ -54,7 +54,7 @@ static const struct gpio_dt_spec buttons[] = {
 /**
  * @brief Button contexts for each button, used for debouncing and event handling
  */
-static BUTTON_CONTEXT button_contexts[BUTTON_ID_COUNT];
+static BUTTON_CONTEXT m_button_contexts[BUTTON_ID_COUNT];
 
 /* Private function prototypes -----------------------------------------------*/
 static void button_gpio_isr(const struct device *dev, struct gpio_callback *cb, uint32_t pins);
@@ -72,33 +72,33 @@ int button_init(void)
 {
 	for (size_t i = 0; i < BUTTON_ID_COUNT; i++) {
 		// Configure button GPIO as input with pull-up and set up interrupt for both edges
-		if (!device_is_ready(buttons[i].port)) {
+		if (!device_is_ready(m_buttons[i].port)) {
 			return -1;
 		}
 
 		// Configure GPIO pin as input with pull-up resistor
-		int ret = gpio_pin_configure_dt(&buttons[i], GPIO_INPUT | GPIO_PULL_UP);
+		int ret = gpio_pin_configure_dt(&m_buttons[i], GPIO_INPUT | GPIO_PULL_UP);
 		if (ret < 0) {
 			return -1;
 		}
 
 		// Initialize GPIO callback for button interrupts
-		gpio_init_callback(&button_contexts[i].gpio_cb, button_gpio_isr, BIT(buttons[i].pin));
-		ret = gpio_add_callback(buttons[i].port, &button_contexts[i].gpio_cb);
+		gpio_init_callback(&m_button_contexts[i].gpio_cb, button_gpio_isr, BIT(m_buttons[i].pin));
+		ret = gpio_add_callback(m_buttons[i].port, &m_button_contexts[i].gpio_cb);
 		if (ret < 0) {
 			return -1;
 		}
 
 		// Configure GPIO interrupt for both rising and falling edges
-		ret = gpio_pin_interrupt_configure_dt(&buttons[i], GPIO_INT_EDGE_BOTH);
+		ret = gpio_pin_interrupt_configure_dt(&m_buttons[i], GPIO_INT_EDGE_BOTH);
 		if (ret < 0) {
 			return -1;
 		}
 
 		// Initialize debounce work for the button context
-		button_contexts[i].stable_state = BUTTON_STATE_RELEASED;
-		button_contexts[i].callback = NULL;
-		k_work_init_delayable(&button_contexts[i].debounce_work, button_debounce_work_handler);
+		m_button_contexts[i].stable_state = BUTTON_STATE_RELEASED;
+		m_button_contexts[i].callback = NULL;
+		k_work_init_delayable(&m_button_contexts[i].debounce_work, button_debounce_work_handler);
 	}
 	return 0;
 }
@@ -116,7 +116,7 @@ int button_get(BUTTON_ID id, BUTTON_STATE *state)
 		return -1;			// Invalid argument
 	}
 
-	int val = gpio_pin_get_dt(&buttons[id]);
+	int val = gpio_pin_get_dt(&m_buttons[id]);
 	if (val < 0) {
 		return -1;			// Error reading GPIO pin
 	}
@@ -138,7 +138,7 @@ int button_get_mask(uint32_t *pressed_mask)
 
 	uint32_t mask = 0;
 	for (size_t i = 0; i < BUTTON_ID_COUNT; i++) {
-		int val = gpio_pin_get_dt(&buttons[i]);
+		int val = gpio_pin_get_dt(&m_buttons[i]);
 		if (val < 0) {
 			return -1;		// Error reading GPIO pin
 		}
@@ -162,7 +162,7 @@ int button_register_callback(BUTTON_ID id, button_callback_t callback)
 	if (id >= BUTTON_ID_COUNT) {
 		return -1;			// Invalid button ID
 	}
-	button_contexts[id].callback = callback;
+	m_button_contexts[id].callback = callback;
 	return 0;
 }
 
@@ -177,7 +177,7 @@ int button_unregister_callback(BUTTON_ID id)
 	if (id >= BUTTON_ID_COUNT) {
 		return -1;			// Invalid button ID
 	}
-	button_contexts[id].callback = NULL;
+	m_button_contexts[id].callback = NULL;
 	return 0;
 }
 
@@ -192,9 +192,9 @@ static void button_gpio_isr(const struct device *dev, struct gpio_callback *cb, 
 {
 	// Identify which button triggered the interrupt
 	for (size_t i = 0; i < BUTTON_ID_COUNT; i++) {
-		if (pins & BIT(buttons[i].pin)) {
+		if (pins & BIT(m_buttons[i].pin)) {
 			// Schedule debounce work for the corresponding button context
-				k_work_reschedule(&button_contexts[i].debounce_work, K_MSEC(BUTTON_DEBOUNE_MS));
+				k_work_reschedule(&m_button_contexts[i].debounce_work, K_MSEC(BUTTON_DEBOUNE_MS));
 			break;
 		}
 	}
@@ -210,20 +210,20 @@ static void button_debounce_work_handler(struct k_work *work)
 
 	// Identify which button context is associated with the debounce work
 	for (size_t i = 0; i < BUTTON_ID_COUNT; i++) {
-		if (&button_contexts[i].debounce_work == dwork) {
+		if (&m_button_contexts[i].debounce_work == dwork) {
 			// Read the current state of the button GPIO pin
-			int val = gpio_pin_get_dt(&buttons[i]);
+			int val = gpio_pin_get_dt(&m_buttons[i]);
 			BUTTON_STATE current_state = (val == 0) ? BUTTON_STATE_PRESSED : BUTTON_STATE_RELEASED;
 
 			// Check if the state has changed from the stable state
-			if (current_state != button_contexts[i].stable_state) {
+			if (current_state != m_button_contexts[i].stable_state) {
 				// Update the stable state
-				button_contexts[i].stable_state = current_state;
+				m_button_contexts[i].stable_state = current_state;
 
 				// If a callback is registered, call it with the button ID and event type
-				if (button_contexts[i].callback) {
+				if (m_button_contexts[i].callback) {
 					BUTTON_EVENT event = (current_state == BUTTON_STATE_PRESSED) ? BUTTON_EVENT_PRESSED : BUTTON_EVENT_RELEASED;
-					button_contexts[i].callback(i, event);
+					m_button_contexts[i].callback(i, event);
 				}
 			}
 			break;

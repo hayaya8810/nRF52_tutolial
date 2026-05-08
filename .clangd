@@ -1,0 +1,10 @@
+CompileFlags:
+  CompilationDatabase: build/blinky
+  Add:
+    - -DCONFIG_GPIO=1
+    - -imacros
+    - /home/muran/workspace/blinky/build/blinky/zephyr/include/generated/zephyr/autoconf.h
+    - -I/home/muran/workspace/blinky/build/blinky/zephyr/include/generated
+    - -I/home/muran/workspace/blinky/build/blinky/zephyr/include/generated/zephyr
+    - -I/home/muran/ncs/v3.3.0/zephyr/include
+    - -I/home/muran/ncs/v3.3.0/nrf/include

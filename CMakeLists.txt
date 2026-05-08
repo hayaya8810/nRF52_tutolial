@@ -8,4 +8,5 @@ target_sources(app PRIVATE
 	src/main.c
 	src/led.c
 	src/button.c
+	src/nus.c
 )

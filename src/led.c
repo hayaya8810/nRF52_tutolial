@@ -44,7 +44,7 @@ typedef struct __LED_CONTEXT {
 /**
  * @brief GPIO specifications for each LED, obtained from device tree
  */
-static const struct gpio_dt_spec leds[] = {
+static const struct gpio_dt_spec m_leds[] = {
 	GPIO_DT_SPEC_GET(LED0_NODE, gpios),
 	GPIO_DT_SPEC_GET(LED1_NODE, gpios),
 	GPIO_DT_SPEC_GET(LED2_NODE, gpios),
@@ -54,7 +54,7 @@ static const struct gpio_dt_spec leds[] = {
 /**
  * @brief LED contexts for each LED, used for blinking functionality
  */
-static LED_CONTEXT led_contexts[LED_ID_COUNT];
+static LED_CONTEXT m_led_contexts[LED_ID_COUNT];
 
 /* Private function prototypes -----------------------------------------------*/
 static void led_blink_work_handler(struct k_work *work);
@@ -70,16 +70,16 @@ static void led_blink_work_handler(struct k_work *work);
 int led_init(void)
 {
 	for (size_t i = 0; i < LED_ID_COUNT; i++) {
-		if (!device_is_ready(leds[i].port)) {
+		if (!device_is_ready(m_leds[i].port)) {
 			return -1;
 		}
-		int ret = gpio_pin_configure_dt(&leds[i], GPIO_OUTPUT_INACTIVE);
+		int ret = gpio_pin_configure_dt(&m_leds[i], GPIO_OUTPUT_INACTIVE);
 		if (ret < 0) {
 			return -1;
 		}
-		k_work_init_delayable(&led_contexts[i].blink_work, led_blink_work_handler);
-		led_contexts[i].is_on = false;
-		led_contexts[i].is_blinking = false;
+		k_work_init_delayable(&m_led_contexts[i].blink_work, led_blink_work_handler);
+		m_led_contexts[i].is_on = false;
+		m_led_contexts[i].is_blinking = false;
 	}
 	return 0;
 }
@@ -93,10 +93,17 @@ int led_init(void)
  */
 int led_set(LED_ID id, LED_STATE state)
 {
+	int ret;
+
 	if (id >= LED_ID_COUNT) {
 		return -1;			// Invalid LED ID
 	}
-	return gpio_pin_set_dt(&leds[id], state == LED_STATE_ON ? 1 : 0);
+
+	ret = gpio_pin_set_dt(&m_leds[id], state == LED_STATE_ON ? 1 : 0);
+	if (ret == 0) {
+		m_led_contexts[id].is_on = (state == LED_STATE_ON);
+	}
+	return ret;
 }
 
 /**
@@ -112,16 +119,7 @@ int led_get(LED_ID id, LED_STATE *state)
 		return -1;			// Invalid argument
 	}
 
-	gpio_flags_t flags;
-	int ret = gpio_pin_get_config_dt(&leds[id], &flags);
-	if (ret < 0 || (flags & GPIO_OUTPUT) == 0) {
-		return -1;			// Error getting LED output state
-	}
-
-	int physical_high = (flags & GPIO_OUTPUT_INIT_HIGH) != 0;
-	int active_low = (leds[id].dt_flags & GPIO_ACTIVE_LOW) != 0;
-
-	*state = (physical_high ^ active_low) ? LED_STATE_ON : LED_STATE_OFF;
+	*state = m_led_contexts[id].is_on ? LED_STATE_ON : LED_STATE_OFF;
 	return 0;
 }
 
@@ -133,10 +131,17 @@ int led_get(LED_ID id, LED_STATE *state)
  */
 int led_toggle(LED_ID id)
 {
+	int ret;
+
 	if (id >= LED_ID_COUNT) {
 		return -1;			// Invalid LED ID
 	}
-	return gpio_pin_toggle_dt(&leds[id]);
+
+	ret = gpio_pin_toggle_dt(&m_leds[id]);
+	if (ret == 0) {
+		m_led_contexts[id].is_on = !m_led_contexts[id].is_on;
+	}
+	return ret;
 }
 
 /**
@@ -189,10 +194,11 @@ int led_blink_start( LED_ID id, uint32_t on_time_ms, uint32_t off_time_ms)
 	if (id >= LED_ID_COUNT) {
 		return -1;			// Invalid LED ID
 	}
-	led_contexts[id].on_time_ms = on_time_ms;
-	led_contexts[id].off_time_ms = off_time_ms;
-	led_contexts[id].is_blinking = true;
-	k_work_reschedule(&led_contexts[id].blink_work, K_NO_WAIT);
+	m_led_contexts[id].on_time_ms = on_time_ms;
+	m_led_contexts[id].off_time_ms = off_time_ms;
+	m_led_contexts[id].is_blinking = true;
+	led_set(id, LED_STATE_ON);
+	k_work_reschedule(&m_led_contexts[id].blink_work, K_MSEC(on_time_ms));
 	return 0;
 }
 
@@ -209,9 +215,9 @@ int led_blink_stop( LED_ID id)
 	}
 
 	// Stop blinking and reset LED state to off
-	led_contexts[id].is_blinking = false;
-	k_work_cancel_delayable(&led_contexts[id].blink_work);
-	led_contexts[id].is_on = false;
+	m_led_contexts[id].is_blinking = false;
+	k_work_cancel_delayable(&m_led_contexts[id].blink_work);
+	m_led_contexts[id].is_on = false;
 	return led_set(id, LED_STATE_OFF);
 }
 
@@ -228,7 +234,7 @@ int led_blink_toggle( LED_ID id, uint32_t on_time_ms, uint32_t off_time_ms)
 	if (id >= LED_ID_COUNT) {
 		return -1;			// Invalid LED ID
 	}
-	if (led_contexts[id].is_blinking) {
+	if (m_led_contexts[id].is_blinking) {
 		return led_blink_stop(id);
 	} else {
 		return led_blink_start(id, on_time_ms, off_time_ms);
@@ -246,15 +252,14 @@ static void led_blink_work_handler(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 
 	for( size_t i = 0; i < LED_ID_COUNT; i++) {
-		if (&led_contexts[i].blink_work == dwork) {
-			if (led_contexts[i].is_blinking) {
+		if (&m_led_contexts[i].blink_work == dwork) {
+			if (m_led_contexts[i].is_blinking) {
 				// Toggle LED state
-				led_contexts[i].is_on = !led_contexts[i].is_on;
-				led_set(i, led_contexts[i].is_on ? LED_STATE_ON : LED_STATE_OFF);
+				led_set(i, m_led_contexts[i].is_on ? LED_STATE_OFF : LED_STATE_ON);
 
 				// Reschedule work for the next toggle
-				uint32_t delay_ms = led_contexts[i].is_on ? led_contexts[i].on_time_ms : led_contexts[i].off_time_ms;
-				k_work_reschedule(&led_contexts[i].blink_work, K_MSEC(delay_ms));
+				uint32_t delay_ms = m_led_contexts[i].is_on ? m_led_contexts[i].on_time_ms : m_led_contexts[i].off_time_ms;
+				k_work_reschedule(&m_led_contexts[i].blink_work, K_MSEC(delay_ms));
 			}
 		}
 	}

@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 #include "button.h"
 #include "led.h"
+#include "nus.h"
 
 /* Private define ------------------------------------------------------------*/
 #define SLEEP_TIME_MS			1000		// 1000ms = 1s
@@ -39,7 +40,7 @@ static void button_handler(BUTTON_ID id, BUTTON_EVENT event);
 
 /* Exported functions --------------------------------------------------------*/
 /**
-* @brief Main function
+ * @brief		Main function
 */
 int main(void)
 {
@@ -52,6 +53,11 @@ int main(void)
 	ret = led_init();
 	if (ret < 0) {
 		printf("Failed to initialize LEDs\n");
+		return -1;
+	}
+	ret = nus_init();
+	if (ret < 0) {
+		printf("Failed to initialize NUS\n");
 		return -1;
 	}
 
@@ -71,7 +77,7 @@ int main(void)
 
 /* Private user code ---------------------------------------------------------*/
 /**
- * @brief Button event handler to toggle corresponding LED on button press
+ * @brief		Button event handler to toggle corresponding LED on button press
  * @param[in]	id			Button identifier
  * @param[in]	event		Button event type (pressed or released)
  */
@@ -81,15 +87,19 @@ static void button_handler(BUTTON_ID id, BUTTON_EVENT event)
 		switch (id){
 		case BUTTON_ID_0:
 			led_blink_toggle(id, 500, 500);	// Toggle blinking with 500ms on and 500ms off
+			nus_notify_led_event((LED_ID)id);
 			break;
 		case BUTTON_ID_1:
 			led_blink_toggle(id, 250, 250);	// Toggle blinking with 500ms on and 500ms off
+			nus_notify_led_event((LED_ID)id);
 			break;
 		case BUTTON_ID_2:
 			led_blink_toggle(id, 125, 125);	// Toggle blinking with 125ms on and 125ms off
+			nus_notify_led_event((LED_ID)id);
 			break;
 		case BUTTON_ID_3:
 			led_toggle(id);
+			nus_notify_led_event((LED_ID)id);
 			break;
 		default:
 			break;
