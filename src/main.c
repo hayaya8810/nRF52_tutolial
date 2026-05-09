@@ -23,6 +23,7 @@
 #include "button.h"
 #include "led.h"
 #include "nus.h"
+#include "app.h"
 
 /* Private define ------------------------------------------------------------*/
 #define SLEEP_TIME_MS			1000		// 1000ms = 1s
@@ -35,6 +36,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 static void button_handler(BUTTON_ID id, BUTTON_EVENT event);
+static void nus_led_control_callback(uint32_t led_mask);
 
 /* External variables --------------------------------------------------------*/
 
@@ -69,7 +71,17 @@ int main(void)
 		}
 	}
 
+	ret = nus_register_led_control_callback(nus_led_control_callback);
+	if (ret < 0) {
+		printf("Failed to register NUS LED control callback\n");
+		return -1;
+	}
+
 	while (1) {
+		APP_EVENT event;
+		if (app_event_get(&event) == 0) {
+			app_handle_event(&event);
+		}
 		k_msleep(SLEEP_TIME_MS);
 	}
 	return 0;
@@ -83,26 +95,38 @@ int main(void)
  */
 static void button_handler(BUTTON_ID id, BUTTON_EVENT event)
 {
+	uint32_t led_mask = 0x00;
+
 	if (event == BUTTON_EVENT_PRESSED) {
 		switch (id){
 		case BUTTON_ID_0:
-			led_blink_toggle(id, 500, 500);	// Toggle blinking with 500ms on and 500ms off
+			led_mask = 0x01;	// Mask for LED_ID_0
 			nus_notify_led_event((LED_ID)id);
 			break;
 		case BUTTON_ID_1:
-			led_blink_toggle(id, 250, 250);	// Toggle blinking with 500ms on and 500ms off
+			led_mask = 0x02;	// Mask for LED_ID_1
 			nus_notify_led_event((LED_ID)id);
 			break;
 		case BUTTON_ID_2:
-			led_blink_toggle(id, 125, 125);	// Toggle blinking with 125ms on and 125ms off
+			led_mask = 0x04;	// Mask for LED_ID_2
 			nus_notify_led_event((LED_ID)id);
 			break;
 		case BUTTON_ID_3:
-			led_toggle(id);
+			led_mask = 0x08;	// Mask for LED_ID_3
 			nus_notify_led_event((LED_ID)id);
 			break;
 		default:
 			break;
 		}
+		app_event_submit(APP_EVENT_TYPE_LED_TOGGLE, led_mask);
 	}
+}
+
+/**
+ * @brief		Callback function for controlling LEDs from BLE commands
+ * @param[in]	led_mask	Bitmask indicating which LEDs to toggle (1 = toggle, 0 = no change)
+ */
+static void nus_led_control_callback(uint32_t led_mask)
+{
+	app_event_submit(APP_EVENT_TYPE_LED_TOGGLE, led_mask);
 }

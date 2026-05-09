@@ -162,6 +162,12 @@ int button_register_callback(BUTTON_ID id, button_callback_t callback)
 	if (id >= BUTTON_ID_COUNT) {
 		return -1;			// Invalid button ID
 	}
+	if( callback == NULL) {
+		return -1;			// Invalid callback
+	}
+	if( m_button_contexts[id].callback != NULL) {
+		return -1;			// Callback already registered for this button
+	}
 	m_button_contexts[id].callback = callback;
 	return 0;
 }

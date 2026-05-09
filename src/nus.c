@@ -7,7 +7,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
@@ -32,8 +34,9 @@ static struct bt_conn *m_current_conn;
 static bool m_notify_enabled;
 static struct k_work_delayable m_notify_work;
 static bool m_pending_led_event;			// Whether there is a pending LED event to notify (as opposed to a pending periodic state notification)
-static LED_ID m_pending_led_id;
+static LED_ID m_pending_led_id;				// If there is a pending LED event, the ID of the LED that changed
 static uint32_t m_notify_count;
+static nus_led_control_callback_t m_led_control_callback = NULL;	// Registered callback for controlling LEDs from BLE commands
 
 /**
  * @brief		BLE advertising data and scan response data
@@ -138,6 +141,36 @@ int nus_notify_led_event(LED_ID id)
 	return 0;
 }
 
+/**
+ * @brief		Register a callback function for controlling LEDs from BLE commands
+ * @param[in]	callback	Callback function to register
+ * @return		0			success
+ * 				negative	error code on failure (e.g., invalid argument, callback already registered)
+ */
+int nus_register_led_control_callback(nus_led_control_callback_t callback)
+{
+	if (callback == NULL) {
+		return -EINVAL;
+	}
+	if (m_led_control_callback != NULL) {
+		return -EBUSY;		// A callback is already registered
+	}
+
+	m_led_control_callback = callback;
+	return 0;
+}
+
+/**
+ * @brief		Unregister the callback function for controlling LEDs from BLE commands
+ * @return		0			success
+ * 				negative	error code on failure (e.g., no callback registered)
+ */
+int nus_unregister_led_control_callback(void)
+{
+	m_led_control_callback = NULL;
+	return 0;
+}
+
 /* Private user code ---------------------------------------------------------*/
 /**
  * @brief		BLE connection callback for when a connection is established
@@ -182,8 +215,16 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
  */
 static void nus_received(struct bt_conn *conn, const uint8_t *const data, uint16_t len)
 {
+	uint32_t mask;
+
 	ARG_UNUSED(conn);
 
+	if( isxdigit((unsigned char)data[0]) != 0) {
+		mask = strtoul((const char *)data, NULL, 16);
+		if (m_led_control_callback != NULL) {
+			m_led_control_callback(mask);
+		}
+	}
 	printf("NUS RX: %.*s\n", len, data);
 }
 
