@@ -26,7 +26,6 @@
 #include "app.h"
 
 /* Private define ------------------------------------------------------------*/
-#define SLEEP_TIME_MS			1000		// 1000ms = 1s
 
 /* Private typedef -----------------------------------------------------------*/
 
@@ -82,7 +81,6 @@ int main(void)
 		if (app_event_get(&event) == 0) {
 			app_handle_event(&event);
 		}
-		k_msleep(SLEEP_TIME_MS);
 	}
 	return 0;
 }

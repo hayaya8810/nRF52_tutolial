@@ -16,7 +16,7 @@
 */
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
-#include <ctype.h>
+#include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -25,16 +25,14 @@
 #include "nus.h"
 
 /* Private define ------------------------------------------------------------*/
+#define APP_EVENT_QUEUE_SIZE		10
 
 /* Private typedef -----------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
 
 /* Private variables ---------------------------------------------------------*/
-APP_EVENT m_event_queue[10];				// Simple fixed-size event queue
-size_t m_event_queue_head = 0;				// Index of the head of the queue
-size_t m_event_queue_tail = 0;				// Index of the tail of the queue
-size_t m_event_queue_count = 0;				// Number of events currently in the queue
+K_MSGQ_DEFINE(m_event_queue, sizeof(APP_EVENT), APP_EVENT_QUEUE_SIZE, 4);
 
 /* Private function prototypes -----------------------------------------------*/
 static int app_toggle_leds(uint32_t led_mask);
@@ -46,21 +44,15 @@ static int app_toggle_leds(uint32_t led_mask);
  * @brief		Get the next application event from the event queue
  * @param[out]	event		Pointer to store the retrieved event
  * @return		0			success
- * 				negative	error code on failure (e.g., no events in the queue)
+ * 				negative	error code on failure
  */
 int app_event_get(APP_EVENT *event)
 {
 	if (event == NULL) {
 		return -1;				// Invalid argument
 	}
-	if (m_event_queue_count == 0) {
-		return -1;				// No events in the queue
-	}
 
-	*event = m_event_queue[m_event_queue_head];
-	m_event_queue_head = (m_event_queue_head + 1) % ARRAY_SIZE(m_event_queue);
-	m_event_queue_count--;
-	return 0;
+	return k_msgq_get(&m_event_queue, event, K_FOREVER);
 }
 
 /**
@@ -89,15 +81,12 @@ int app_handle_event(const APP_EVENT *event)
 
 int app_event_submit(APP_EVENT_TYPE type, uint32_t led_mask)
 {
-	if (m_event_queue_count >= ARRAY_SIZE(m_event_queue)) {
-		return -1;				// Event queue is full
-	}
+	APP_EVENT event = {
+		.type = type,
+		.led_mask = led_mask,
+	};
 
-	m_event_queue[m_event_queue_tail].type = type;
-	m_event_queue[m_event_queue_tail].led_mask = led_mask;
-	m_event_queue_tail = (m_event_queue_tail + 1) % ARRAY_SIZE(m_event_queue);
-	m_event_queue_count++;
-	return 0;
+	return k_msgq_put(&m_event_queue, &event, K_NO_WAIT);
 }
 
 /* Private user code ---------------------------------------------------------*/
