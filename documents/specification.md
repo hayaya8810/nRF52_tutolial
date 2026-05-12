@@ -161,6 +161,7 @@ end
 
 ```plantuml
 @startuml
+scale 0.8
 title 実行文脈とイベント経路
 
 actor "User" as Actor
@@ -303,6 +304,7 @@ NUS TX notification は `notify_work_handler()` で送信される。送信予�
 
 ```plantuml
 @startuml
+scale 0.8
 title ボタン押下による LED 操作
 
 actor User
@@ -312,7 +314,7 @@ participant "button_gpio_isr()" as ISR
 end box
 
 box "System workqueue thread" #LightGreen
-participant "button_debounce_work\n_handler()" as Debounce
+participant "button_debounce\n_work_handler()" as Debounce
 participant "notify_work\n_handler()" as Notify
 participant "led_blink_work\n_handler()" as Blink
 end box
@@ -328,12 +330,12 @@ participant "LED driver" as Led
 participant "NUS" as Nus
 participant "BLE peer" as Peer
 
-User -> ISR: ボタン GPIO エッジ発生
+User -> ISR: ボタン GPIO\nエッジ発生
 activate ISR
 ISR -> Debounce: k_work_reschedule()
 deactivate ISR
 activate Debounce
-Debounce -> Debounce: GPIOを再読み取り\n安定状態を判定
+Debounce -> Debounce: GPIOを\n再読み取り、\n安定状態を判定
 alt 押下状態に変化
   Debounce -> Handler: callback()
   activate Handler
@@ -344,7 +346,7 @@ alt 押下状態に変化
     LED状態のNUS送信を予約
   end note
   deactivate Nus
-  Handler -> Submit: app_event_submit()
+  Handler -> Submit: app_event\n_submit()
   deactivate Handler
   activate Submit
 else 解放または変化なし
@@ -377,7 +379,7 @@ alt LED 0..2 の点滅開始
   Blink -> Led: led_set()
   activate Blink
   deactivate Led
-  Blink -> Blink: 次回トグルを再予約
+  Blink -> Blink: 次回トグルを\n再予約
   deactivate Blink
 end
 
@@ -398,6 +400,7 @@ deactivate Notify
 
 ```plantuml
 @startuml
+scale 0.9
 title NUS RX による LED 操作
 
 actor "BLE peer" as Peer
